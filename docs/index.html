@@ -17,17 +17,24 @@
       <header class="topbar">
         <div>
           <h1>근무표</h1>
-          <p id="statusText">불러오는 중</p>
         </div>
         <button id="installButton" class="icon-button hidden" type="button" title="홈 화면에 추가">＋</button>
       </header>
 
       <main>
-        <section class="controls" aria-label="근무표 설정">
-          <label class="field">
-            <span>근무자</span>
-            <select id="employeeSelect"></select>
-          </label>
+        <section id="controlsPanel" class="controls" aria-label="근무표 설정">
+          <div class="controls-head">
+            <span class="controls-title">근무자</span>
+            <p id="statusText">불러오는 중</p>
+            <button id="controlsToggle" class="small-button" type="button" title="설정 접기">접기</button>
+          </div>
+
+          <div class="employee-row">
+            <label class="field">
+              <span>근무자</span>
+              <select id="employeeSelect"></select>
+            </label>
+          </div>
 
           <div class="month-row">
             <button id="prevMonthButton" class="icon-button" type="button" title="이전 달">‹</button>
@@ -35,8 +42,6 @@
             <button id="nextMonthButton" class="icon-button" type="button" title="다음 달">›</button>
             <button id="refreshButton" class="icon-button" type="button" title="새로고침">↻</button>
           </div>
-
-          <div id="summaryRow" class="summary-row"></div>
         </section>
 
         <section class="calendar-wrap" aria-label="월간 근무표">
@@ -51,24 +56,30 @@
           </div>
           <div id="calendarGrid" class="calendar-grid"></div>
         </section>
-
-        <section id="detailPanel" class="detail-panel" aria-label="선택 날짜 상세">
-          <div class="detail-head">
-            <div>
-              <h2 id="detailDate">날짜 선택</h2>
-              <p id="detailSub">달력에서 날짜를 눌러주세요.</p>
-            </div>
-            <span id="detailDuty" class="duty-note hidden">당직</span>
-          </div>
-
-          <div class="readonly-block">
-            <span>근무 코드</span>
-            <strong id="codeText">-</strong>
-          </div>
-
-          <div id="sheetDetail" class="sheet-detail hidden"></div>
-        </section>
       </main>
+    </div>
+
+    <div id="dayModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalDate">
+      <div id="modalBackdrop" class="modal-backdrop"></div>
+      <section class="modal-card">
+        <div class="modal-head">
+          <div>
+            <h2 id="modalDate">날짜</h2>
+            <p id="modalEmployee">근무자</p>
+          </div>
+          <button id="modalCloseButton" class="icon-button" type="button" title="닫기">×</button>
+        </div>
+
+        <div class="modal-section">
+          <span>근무 코드</span>
+          <strong id="modalCode">-</strong>
+        </div>
+
+        <div class="modal-section">
+          <span>메모</span>
+          <p id="modalMemo">메모 없음</p>
+        </div>
+      </section>
     </div>
   </body>
 </html>
