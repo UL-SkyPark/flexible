@@ -1,5 +1,5 @@
 {
-  "name": "근무표 모바일",
+  "name": "근무표",
   "short_name": "근무표",
   "description": "구글시트 근무표를 모바일 달력으로 확인하는 PWA",
   "start_url": "./",
