@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f5f96" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="근무표" />
+    <title>근무표 모바일</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <h1>근무표</h1>
+          <p id="statusText">불러오는 중</p>
+        </div>
+        <button id="installButton" class="icon-button hidden" type="button" title="홈 화면에 추가">＋</button>
+      </header>
+
+      <main>
+        <section class="controls" aria-label="근무표 설정">
+          <label class="field">
+            <span>근무자</span>
+            <select id="employeeSelect"></select>
+          </label>
+
+          <div class="month-row">
+            <button id="prevMonthButton" class="icon-button" type="button" title="이전 달">‹</button>
+            <button id="todayButton" class="month-title" type="button">-</button>
+            <button id="nextMonthButton" class="icon-button" type="button" title="다음 달">›</button>
+            <button id="refreshButton" class="icon-button" type="button" title="새로고침">↻</button>
+          </div>
+
+          <div id="summaryRow" class="summary-row"></div>
+        </section>
+
+        <section class="calendar-wrap" aria-label="월간 근무표">
+          <div class="weekday-row" aria-hidden="true">
+            <span>일</span>
+            <span>월</span>
+            <span>화</span>
+            <span>수</span>
+            <span>목</span>
+            <span>금</span>
+            <span>토</span>
+          </div>
+          <div id="calendarGrid" class="calendar-grid"></div>
+        </section>
+
+        <section id="detailPanel" class="detail-panel" aria-label="선택 날짜 상세">
+          <div class="detail-head">
+            <div>
+              <h2 id="detailDate">날짜 선택</h2>
+              <p id="detailSub">달력에서 날짜를 눌러주세요.</p>
+            </div>
+            <span id="detailDuty" class="duty-note hidden">당직</span>
+          </div>
+
+          <div class="readonly-block">
+            <span>근무 코드</span>
+            <strong id="codeText">-</strong>
+          </div>
+
+          <div id="sheetDetail" class="sheet-detail hidden"></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
