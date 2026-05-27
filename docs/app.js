@@ -3,14 +3,6 @@ const SHEET_URL =
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const DUTY_MARK = "●";
-const SHIFT_CODES = ["A", "B", "C", "D", "E", "F", "G"];
-const SHIFT_GROUPS = [
-  { label: "운구", codes: ["A", "B"] },
-  { label: "접수", codes: ["C", "D"] },
-  { label: "안내", codes: ["E"] },
-  { label: "자연", codes: ["F"] },
-  { label: "추모", codes: ["G"] },
-];
 
 const SETTINGS_KEY = "work-schedule-mobile-settings";
 const CACHE_KEY = "work-schedule-mobile-cache";
@@ -21,6 +13,7 @@ const state = {
     selectedEmployee: "",
     monthOffset: 0,
     selectedIso: "",
+    controlsCollapsed: false,
   }),
   fetchedAt: "",
   deferredInstallPrompt: null,
@@ -28,20 +21,22 @@ const state = {
 
 const els = {
   calendarGrid: document.getElementById("calendarGrid"),
-  codeText: document.getElementById("codeText"),
-  detailDate: document.getElementById("detailDate"),
-  detailDuty: document.getElementById("detailDuty"),
-  detailPanel: document.getElementById("detailPanel"),
-  detailSub: document.getElementById("detailSub"),
+  controlsPanel: document.getElementById("controlsPanel"),
+  controlsToggle: document.getElementById("controlsToggle"),
   employeeSelect: document.getElementById("employeeSelect"),
   installButton: document.getElementById("installButton"),
+  modalBackdrop: document.getElementById("modalBackdrop"),
+  modalCloseButton: document.getElementById("modalCloseButton"),
+  modalCode: document.getElementById("modalCode"),
+  modalDate: document.getElementById("modalDate"),
+  modalEmployee: document.getElementById("modalEmployee"),
+  modalMemo: document.getElementById("modalMemo"),
+  dayModal: document.getElementById("dayModal"),
   monthLabel: document.getElementById("todayButton"),
   nextMonthButton: document.getElementById("nextMonthButton"),
   prevMonthButton: document.getElementById("prevMonthButton"),
   refreshButton: document.getElementById("refreshButton"),
-  sheetDetail: document.getElementById("sheetDetail"),
   statusText: document.getElementById("statusText"),
-  summaryRow: document.getElementById("summaryRow"),
   todayButton: document.getElementById("todayButton"),
 };
 
@@ -397,47 +392,12 @@ function renderMonthLabel() {
   }).format(viewDate);
 }
 
-function renderSummary(days, employee) {
-  const codeCounts = Object.fromEntries(SHIFT_CODES.map((code) => [code, 0]));
-  let restCount = 0;
-  let overtimeCount = 0;
-  let dutyCount = 0;
-
-  for (const day of days.filter((item) => item.inMonth)) {
-    const { code } = displayForDay(employee, day.iso);
-    const shift = classifyShiftCode(code);
-    for (const code of shift.codes) codeCounts[code] += 1;
-    if (shift.hasRest) restCount += 1;
-    if (shift.hasOvertime) overtimeCount += 1;
-    if (shift.hasDuty) dutyCount += 1;
-  }
-
-  els.summaryRow.replaceChildren();
-  for (const group of SHIFT_GROUPS) {
-    const count = group.codes.reduce((sum, code) => sum + codeCounts[code], 0);
-    const chip = document.createElement("span");
-    chip.className = "summary-chip";
-    chip.textContent = `${group.label} ${count}`;
-    chip.title = group.codes.map((code) => `${code} ${codeCounts[code]}`).join(" / ");
-    els.summaryRow.append(chip);
-  }
-
-  const rest = document.createElement("span");
-  rest.className = "summary-chip rest";
-  rest.textContent = `휴무 ${restCount}`;
-  els.summaryRow.append(rest);
-
-  const overtime = document.createElement("span");
-  overtime.className = "summary-chip overtime";
-  overtime.textContent = `초과 ${overtimeCount}`;
-  els.summaryRow.append(overtime);
-
-  if (dutyCount > 0) {
-    const duty = document.createElement("span");
-    duty.className = "summary-chip duty";
-    duty.textContent = `당직 ${dutyCount}`;
-    els.summaryRow.append(duty);
-  }
+function renderControls() {
+  const isCollapsed = Boolean(state.settings.controlsCollapsed);
+  els.controlsPanel.classList.toggle("collapsed", isCollapsed);
+  els.controlsToggle.textContent = isCollapsed ? "펼치기" : "접기";
+  els.controlsToggle.title = isCollapsed ? "근무자 설정 펼치기" : "근무자 설정 접기";
+  els.controlsToggle.setAttribute("aria-expanded", String(!isCollapsed));
 }
 
 function renderCalendar() {
@@ -458,7 +418,6 @@ function renderCalendar() {
       "day-button",
       day.inMonth ? "in-month" : "out-month",
       day.isToday ? "today" : "",
-      day.iso === state.settings.selectedIso ? "selected" : "",
       shift.hasRest ? "rest-day" : "",
       shift.hasOvertime ? "overtime-day" : "",
       shift.hasDuty ? "duty-day" : "",
@@ -466,6 +425,7 @@ function renderCalendar() {
       .filter(Boolean)
       .join(" ");
     button.dataset.iso = day.iso;
+    button.setAttribute("aria-label", `${day.iso} ${display.code || "근무 없음"}`);
 
     const number = document.createElement("span");
     number.className = "day-number";
@@ -481,52 +441,59 @@ function renderCalendar() {
     button.addEventListener("click", () => {
       state.settings.selectedIso = day.iso;
       saveSettings();
-      renderCalendar();
-      renderDetail();
-      els.detailPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      openDayModal(day, employee);
     });
 
     els.calendarGrid.append(button);
   }
-
-  renderSummary(days, employee);
 }
 
-function renderDetail() {
-  const employee = getEmployee();
-  const iso = state.settings.selectedIso;
-  if (!employee || !iso) return;
-
-  const date = new Date(`${iso}T00:00:00`);
-  const display = displayForDay(employee, iso);
+function openDayModal(day, employee) {
+  const date = new Date(`${day.iso}T00:00:00`);
+  const display = displayForDay(employee, day.iso);
   const shift = classifyShiftCode(display.code);
-  els.detailDate.textContent = new Intl.DateTimeFormat("ko-KR", {
+  const memoLines = [];
+  if (shift.hasDuty) memoLines.push("당직");
+  if (display.source.detail) memoLines.push(display.source.detail);
+
+  els.modalDate.textContent = new Intl.DateTimeFormat("ko-KR", {
     month: "long",
     day: "numeric",
     weekday: "short",
   }).format(date);
-  els.detailSub.textContent = employee.name;
-  els.codeText.replaceChildren();
+  els.modalEmployee.textContent = employee.name;
+  els.modalCode.replaceChildren();
   const formatted = formatCode(display.code);
   if (formatted) {
-    els.codeText.append(formatted);
+    els.modalCode.append(formatted);
   } else {
-    els.codeText.textContent = "-";
+    els.modalCode.textContent = "-";
   }
-  els.detailDuty.classList.toggle("hidden", !shift.hasDuty);
-  els.sheetDetail.textContent = display.source.detail;
-  els.sheetDetail.classList.toggle("hidden", !display.source.detail);
+  els.modalMemo.textContent = memoLines.join("\n") || "메모 없음";
+  els.dayModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function closeDayModal() {
+  els.dayModal.classList.add("hidden");
+  document.body.classList.remove("modal-open");
 }
 
 function renderAll() {
   if (!state.schedule) return;
+  renderControls();
   renderEmployees();
   renderMonthLabel();
   renderCalendar();
-  renderDetail();
 }
 
 function bindEvents() {
+  els.controlsToggle.addEventListener("click", () => {
+    state.settings.controlsCollapsed = !state.settings.controlsCollapsed;
+    saveSettings();
+    renderControls();
+  });
+
   els.employeeSelect.addEventListener("change", () => {
     state.settings.selectedEmployee = els.employeeSelect.value;
     saveSettings();
@@ -574,6 +541,12 @@ function bindEvents() {
     await state.deferredInstallPrompt.userChoice;
     state.deferredInstallPrompt = null;
     els.installButton.classList.add("hidden");
+  });
+
+  els.modalBackdrop.addEventListener("click", closeDayModal);
+  els.modalCloseButton.addEventListener("click", closeDayModal);
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeDayModal();
   });
 }
 
