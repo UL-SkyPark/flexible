@@ -14,33 +14,26 @@
   </head>
   <body>
     <div class="app">
-      <header class="topbar">
+      <header class="app-header">
         <div>
           <h1>근무표</h1>
+          <p id="statusText">불러오는 중</p>
         </div>
-        <button id="installButton" class="icon-button hidden" type="button" title="홈 화면에 추가">＋</button>
+        <button id="installButton" class="round-button hidden" type="button" title="홈 화면에 추가">＋</button>
       </header>
 
       <main>
-        <section id="controlsPanel" class="controls" aria-label="근무표 설정">
-          <div class="controls-head">
-            <span class="controls-title">근무자</span>
-            <p id="statusText">불러오는 중</p>
-            <button id="controlsToggle" class="small-button" type="button" title="설정 접기">접기</button>
-          </div>
-
-          <div class="employee-row">
-            <label class="field">
-              <span>근무자</span>
-              <select id="employeeSelect"></select>
-            </label>
-          </div>
+        <section class="schedule-bar" aria-label="근무표 선택">
+          <label class="employee-field">
+            <span>근무자</span>
+            <select id="employeeSelect"></select>
+          </label>
 
           <div class="month-row">
-            <button id="prevMonthButton" class="icon-button" type="button" title="이전 달">‹</button>
-            <button id="todayButton" class="month-title" type="button">-</button>
-            <button id="nextMonthButton" class="icon-button" type="button" title="다음 달">›</button>
-            <button id="refreshButton" class="icon-button" type="button" title="새로고침">↻</button>
+            <button id="prevMonthButton" class="round-button" type="button" title="이전 달">‹</button>
+            <button id="todayButton" class="month-title" type="button" title="이번 달로 이동">-</button>
+            <button id="nextMonthButton" class="round-button" type="button" title="다음 달">›</button>
+            <button id="refreshButton" class="round-button" type="button" title="새로고침">↻</button>
           </div>
         </section>
 
@@ -67,7 +60,7 @@
             <h2 id="modalDate">날짜</h2>
             <p id="modalEmployee">근무자</p>
           </div>
-          <button id="modalCloseButton" class="icon-button" type="button" title="닫기">×</button>
+          <button id="modalCloseButton" class="round-button" type="button" title="닫기">×</button>
         </div>
 
         <div class="modal-section">
