@@ -13,7 +13,6 @@ const state = {
     selectedEmployee: "",
     monthOffset: 0,
     selectedIso: "",
-    controlsCollapsed: false,
   }),
   fetchedAt: "",
   deferredInstallPrompt: null,
@@ -21,8 +20,6 @@ const state = {
 
 const els = {
   calendarGrid: document.getElementById("calendarGrid"),
-  controlsPanel: document.getElementById("controlsPanel"),
-  controlsToggle: document.getElementById("controlsToggle"),
   employeeSelect: document.getElementById("employeeSelect"),
   installButton: document.getElementById("installButton"),
   modalBackdrop: document.getElementById("modalBackdrop"),
@@ -392,14 +389,6 @@ function renderMonthLabel() {
   }).format(viewDate);
 }
 
-function renderControls() {
-  const isCollapsed = Boolean(state.settings.controlsCollapsed);
-  els.controlsPanel.classList.toggle("collapsed", isCollapsed);
-  els.controlsToggle.textContent = isCollapsed ? "펼치기" : "접기";
-  els.controlsToggle.title = isCollapsed ? "근무자 설정 펼치기" : "근무자 설정 접기";
-  els.controlsToggle.setAttribute("aria-expanded", String(!isCollapsed));
-}
-
 function renderCalendar() {
   const employee = getEmployee();
   const viewDate = currentViewDate();
@@ -481,19 +470,12 @@ function closeDayModal() {
 
 function renderAll() {
   if (!state.schedule) return;
-  renderControls();
   renderEmployees();
   renderMonthLabel();
   renderCalendar();
 }
 
 function bindEvents() {
-  els.controlsToggle.addEventListener("click", () => {
-    state.settings.controlsCollapsed = !state.settings.controlsCollapsed;
-    saveSettings();
-    renderControls();
-  });
-
   els.employeeSelect.addEventListener("change", () => {
     state.settings.selectedEmployee = els.employeeSelect.value;
     saveSettings();
