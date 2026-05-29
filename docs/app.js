@@ -1,5 +1,11 @@
-const SHEET_URL =
+const LEGACY_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1bMmf9UL5EIiN9yDiDEFY2TwR0OEp_bf1KT9nweBGjRk/export?format=csv&gid=574467458";
+const JUNE_2026_SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1f1O5nXXIC6VszJZBNsvNAN1F5oyKnoC63x8kVE3AAUU/export?format=csv&gid=1155897135";
+const SHEET_SOURCES = [
+  { startsOn: "0000-01-01", url: LEGACY_SHEET_URL },
+  { startsOn: "2026-06-01", url: JUNE_2026_SHEET_URL },
+];
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const DUTY_MARK = "●";
@@ -59,6 +65,24 @@ function toIsoDate(date) {
 
 function addDays(date, amount) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+}
+
+function normalizeReferenceDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const match = String(value ?? "").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match) {
+    return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  }
+
+  return new Date();
+}
+
+function sheetUrlForDate(value = new Date()) {
+  const iso = toIsoDate(normalizeReferenceDate(value));
+  return SHEET_SOURCES.reduce((selected, source) => (source.startsOn <= iso ? source : selected), SHEET_SOURCES[0]).url;
 }
 
 function parseCsv(text) {
@@ -163,7 +187,7 @@ function findDateColumns(dayRow, weekdayRow) {
   return columns;
 }
 
-function findKnownYears(rows) {
+function findKnownYears(rows, referenceDate) {
   const years = new Set();
   for (const row of rows) {
     for (const cell of row) {
@@ -172,6 +196,14 @@ function findKnownYears(rows) {
       for (const match of matches) years.add(Number(match));
     }
   }
+
+  if (referenceDate) {
+    const year = referenceDate.getFullYear();
+    years.add(year - 1);
+    years.add(year);
+    years.add(year + 1);
+  }
+
   return [...years].sort((a, b) => a - b);
 }
 
@@ -186,8 +218,9 @@ function scoreStartDate(startDate, columns) {
   return score;
 }
 
-function inferStartDate(rows, columns) {
-  const years = findKnownYears(rows);
+function inferStartDate(rows, columns, options = {}) {
+  const referenceDate = options.referenceDate ? normalizeReferenceDate(options.referenceDate) : null;
+  const years = findKnownYears(rows, referenceDate);
   const minYear = years.length ? Math.min(...years) - 1 : 2020;
   const maxYear = years.length ? Math.max(...years) + 2 : 2035;
   const firstDay = columns[0].day;
@@ -198,7 +231,10 @@ function inferStartDate(rows, columns) {
       if (firstDay > new Date(year, month + 1, 0).getDate()) continue;
       const candidate = new Date(year, month, firstDay);
       const score = scoreStartDate(candidate, columns);
-      if (!best || score > best.score) best = { date: candidate, score };
+      const distance = referenceDate ? Math.abs(candidate.getTime() - referenceDate.getTime()) : 0;
+      if (!best || score > best.score || (score === best.score && distance < best.distance)) {
+        best = { date: candidate, distance, score };
+      }
     }
   }
 
@@ -220,11 +256,11 @@ function splitShiftCell(value) {
   };
 }
 
-function parseScheduleCsv(csv) {
+function parseScheduleCsv(csv, options = {}) {
   const rows = parseCsv(csv);
   const { dayRowIndex, weekdayRowIndex } = findHeaderRows(rows);
   const dateColumns = findDateColumns(rows[dayRowIndex], rows[weekdayRowIndex]);
-  const startDate = inferStartDate(rows, dateColumns);
+  const startDate = inferStartDate(rows, dateColumns, options);
   const datedColumns = dateColumns.map((dateColumn, index) => {
     const date = addDays(startDate, index);
     return {
@@ -346,9 +382,12 @@ function saveSettings() {
 }
 
 async function fetchSchedule(force = false) {
+  const referenceDate = currentViewDate();
+  const sourceUrl = sheetUrlForDate(referenceDate);
+
   if (!force) {
     const cached = loadJson(CACHE_KEY, null);
-    if (cached?.schedule) {
+    if (cached?.schedule && cached.sourceUrl === sourceUrl) {
       state.schedule = cached.schedule;
       state.fetchedAt = cached.fetchedAt ?? "";
       renderAll();
@@ -356,12 +395,12 @@ async function fetchSchedule(force = false) {
   }
 
   setStatus("시트 동기화 중");
-  const response = await fetch(`${SHEET_URL}&_=${Date.now()}`, { cache: "no-store" });
+  const response = await fetch(`${sourceUrl}&_=${Date.now()}`, { cache: "no-store" });
   if (!response.ok) throw new Error(`시트 응답 오류: ${response.status}`);
-  const schedule = parseScheduleCsv(await response.text());
+  const schedule = parseScheduleCsv(await response.text(), { referenceDate });
   state.schedule = schedule;
   state.fetchedAt = new Date().toISOString();
-  saveJson(CACHE_KEY, { schedule, fetchedAt: state.fetchedAt });
+  saveJson(CACHE_KEY, { schedule, fetchedAt: state.fetchedAt, sourceUrl });
   setStatus(`${pad(new Date().getHours())}:${pad(new Date().getMinutes())} 동기화`);
 }
 
@@ -482,22 +521,40 @@ function bindEvents() {
     renderAll();
   });
 
-  els.prevMonthButton.addEventListener("click", () => {
+  els.prevMonthButton.addEventListener("click", async () => {
     state.settings.monthOffset -= 1;
     saveSettings();
+    try {
+      await fetchSchedule(false);
+    } catch (error) {
+      console.error(error);
+      setStatus("동기화 실패");
+    }
     renderAll();
   });
 
-  els.nextMonthButton.addEventListener("click", () => {
+  els.nextMonthButton.addEventListener("click", async () => {
     state.settings.monthOffset += 1;
     saveSettings();
+    try {
+      await fetchSchedule(false);
+    } catch (error) {
+      console.error(error);
+      setStatus("동기화 실패");
+    }
     renderAll();
   });
 
-  els.todayButton.addEventListener("click", () => {
+  els.todayButton.addEventListener("click", async () => {
     state.settings.monthOffset = 0;
     state.settings.selectedIso = toIsoDate(new Date());
     saveSettings();
+    try {
+      await fetchSchedule(false);
+    } catch (error) {
+      console.error(error);
+      setStatus("동기화 실패");
+    }
     renderAll();
   });
 
@@ -546,7 +603,7 @@ async function init() {
     console.error(error);
     setStatus("시트 연결 실패");
     const cached = loadJson(CACHE_KEY, null);
-    if (cached?.schedule) {
+    if (cached?.schedule && cached.sourceUrl === sheetUrlForDate(currentViewDate())) {
       state.schedule = cached.schedule;
       state.fetchedAt = cached.fetchedAt;
       renderAll();
