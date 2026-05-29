@@ -1,4 +1,4 @@
-const CACHE_NAME = "work-schedule-mobile-v4";
+const CACHE_NAME = "work-schedule-mobile-v6";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -33,15 +33,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetched = fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        })
-        .catch(() => cached);
-      return cached ?? fetched;
-    }),
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      })
+      .catch(() => caches.match(request)),
   );
 });
